@@ -2,6 +2,7 @@ import io
 import json
 import re
 import socket
+import threading
 from dataclasses import dataclass
 from typing import Callable, Dict, Match, Optional, Pattern, Tuple, Union, cast
 from urllib.parse import urlparse
@@ -47,6 +48,8 @@ COMMANDS = {
 }
 
 INBOX_PREFIX = bytearray(b"_INBOX.")
+
+T_LOCK = threading.Lock()
 
 
 @dataclass
@@ -240,7 +243,10 @@ class NATSClient:
         self._send(CONNECT_OP, json.dumps(options))
 
     def _send(self, *parts: Union[bytes, str, int]) -> None:
-        self._socket.sendall(_SPC_.join(self._encode(p) for p in parts) + _CRLF_)
+        line = _SPC_.join(self._encode(p) for p in parts) + _CRLF_
+
+        with T_LOCK:
+            self._socket.sendall(line)
 
     def _encode(self, value: Union[bytes, str, int]) -> bytes:
         if isinstance(value, bytes):
