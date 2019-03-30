@@ -5,6 +5,7 @@ import socket
 from dataclasses import dataclass
 from typing import Callable, Dict, Match, Optional, Pattern, Tuple, Union, cast
 from urllib.parse import urlparse
+from signal import signal, SIGINT, SIGTERM, SIGABRT
 
 import pkg_resources
 
@@ -208,9 +209,15 @@ class NATSClient:
 
         return reply_messages[sub.sid]
 
-    def wait(self, *, count=None) -> None:
+    def wait(self, *, count=None, stop_signals=(SIGINT,SIGTERM,SIGABRT)) -> None:
         total = 0
-        while True:
+        is_idle = True
+        def signal_handler(*args):
+            is_idle = False
+            self._socket.shutdown(socket.SHUT_RDWR) # XXX
+        for s in stop_signals:
+            signal(s, signal_handler)
+        while is_idle:
             command, result = self._recv(MSG_RE, PING_RE, OK_RE)
             if command is MSG_RE:
                 self._handle_message(result)
